@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useUser } from '@clerk/clerk-expo'
 import { Ionicons } from '@expo/vector-icons'
-import { styles } from '@/assets/styles/groups.styles.js' // You'll need to create this
+import { styles } from '@/assets/styles/groups.styles.js'
 import { COLORS } from '@/constants/colors'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export default function Page() {
   const router = useRouter()
@@ -12,53 +13,64 @@ export default function Page() {
   
   const [searchQuery, setSearchQuery] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [userGroups, setUserGroups] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  // TODO: Replace with actual database queries
-  const userGroups = [
-    {
-      id: 1,
-      name: "Roommates",
-      description: "Shared apartment expenses",
-      members: [
-        { id: "user1", name: "You", email: user?.emailAddresses[0]?.emailAddress },
-        { id: "user2", name: "John Doe", email: "john@example.com" },
-        { id: "user3", name: "Sarah Smith", email: "sarah@example.com" }
-      ],
-      totalExpenses: 1247.85,
-      createdBy: "user1",
-      createdAt: "2024-01-01",
-      recentActivity: "Added 'Groceries' expense 2 days ago"
-    },
-    {
-      id: 2,
-      name: "Trip to Vegas",
-      description: "Bachelor party expenses",
-      members: [
-        { id: "user1", name: "You", email: user?.emailAddresses[0]?.emailAddress },
-        { id: "user4", name: "Mike Johnson", email: "mike@example.com" },
-        { id: "user5", name: "Lisa Brown", email: "lisa@example.com" },
-        { id: "user6", name: "Tom Wilson", email: "tom@example.com" }
-      ],
-      totalExpenses: 3456.20,
-      createdBy: "user4",
-      createdAt: "2024-01-10",
-      recentActivity: "Added 'Hotel booking' expense 1 week ago"
-    },
-    {
-      id: 3,
-      name: "Work Lunch Group",
-      description: "Weekly team lunches",
-      members: [
-        { id: "user1", name: "You", email: user?.emailAddresses[0]?.emailAddress },
-        { id: "user7", name: "Anna Davis", email: "anna@example.com" },
-        { id: "user8", name: "David Lee", email: "david@example.com" }
-      ],
-      totalExpenses: 284.50,
-      createdBy: "user7",
-      createdAt: "2024-01-05",
-      recentActivity: "Added 'Thai restaurant' expense yesterday"
+  // Fetch user groups from backend
+  const fetchUserGroups = async () => {
+    try {
+      setLoading(true)
+      setError('')
+      
+      // Get user UUID from AsyncStorage
+      const userUUID = await AsyncStorage.getItem('userUUID')
+      
+      if (!userUUID) {
+        setError('User not authenticated. Please sign in again.')
+        return
+      }
+
+      const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.API_BASE_URL
+      
+      if (!baseUrl) {
+        setError('Server configuration error. Please try again later.')
+        return
+      }
+
+      const response = await fetch(`${baseUrl}/groups/${userUUID}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const groups = await response.json()
+        setUserGroups(groups)
+      } else if (response.status === 404) {
+        // No groups found - this is normal for new users
+        setUserGroups([])
+      } else {
+        setError(`Failed to load groups: ${response.status}`)
+      }
+    } catch (error) {
+      console.error('Error fetching user groups:', error)
+      setError('Network error. Please check your connection and try again.')
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
+
+  // Fetch groups when component mounts
+  useEffect(() => {
+    fetchUserGroups()
+  }, [])
+
+  // Retry function for error states
+  const handleRetry = () => {
+    fetchUserGroups()
+  }
 
   const filteredGroups = userGroups.filter(group => 
     group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -83,7 +95,6 @@ export default function Page() {
 
   const renderGroupItem = (group) => (
     <TouchableOpacity 
-      key={group.id} 
       style={styles.groupItem}
       onPress={() => router.push(`/group/${group.id}`)}
     >
@@ -159,6 +170,54 @@ export default function Page() {
     </TouchableOpacity>
   )
 
+  // Loading state
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Groups</Text>
+          <TouchableOpacity onPress={handleCreateGroup}>
+            <Ionicons name="add" size={24} color={COLORS.primary} />
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading your groups...</Text>
+        </View>
+      </View>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Groups</Text>
+          <TouchableOpacity onPress={handleCreateGroup}>
+            <Ionicons name="add" size={24} color={COLORS.primary} />
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color={COLORS.expense} />
+          <Text style={styles.errorTitle}>Unable to load groups</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    )
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -209,7 +268,83 @@ export default function Page() {
             <Text style={styles.sectionTitle}>
               Your Groups ({filteredGroups.length})
             </Text>
-            {filteredGroups.map(renderGroupItem)}
+            {filteredGroups.map(group => (
+              <TouchableOpacity 
+                key={group.id}
+                style={styles.groupItem}
+                onPress={() => router.push(`/group/${group.id}`)}
+              >
+                <View style={styles.groupHeader}>
+                  <View style={styles.groupIcon}>
+                    <Ionicons name="people" size={24} color={COLORS.primary} />
+                  </View>
+                  <View style={styles.groupInfo}>
+                    <Text style={styles.groupName}>{group.name}</Text>
+                    <Text style={styles.groupDescription}>{group.description}</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.groupMenuButton}
+                    onPress={() => {
+                      Alert.alert(
+                        'Group Options',
+                        `Options for ${group.name}`,
+                        [
+                          { text: 'View Details', onPress: () => router.push(`/group/${group.id}`) },
+                          { text: 'Edit Group', onPress: () => router.push(`/group/${group.id}/edit`) },
+                          { text: 'Leave Group', style: 'destructive', onPress: () => {
+                            Alert.alert(
+                              'Leave Group',
+                              `Are you sure you want to leave ${group.name}?`,
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                { text: 'Leave', style: 'destructive', onPress: () => {
+                                  // TODO: Leave group logic
+                                  console.log('Leave group:', group.id)
+                                }}
+                              ]
+                            )
+                          }},
+                          { text: 'Cancel', style: 'cancel' }
+                        ]
+                      )
+                    }}
+                  >
+                    <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textLight} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.groupStats}>
+                  <View style={styles.groupStat}>
+                    <Text style={styles.groupStatNumber}>{group.members.length}</Text>
+                    <Text style={styles.groupStatLabel}>Members</Text>
+                  </View>
+                  <View style={styles.groupStat}>
+                    <Text style={styles.groupStatNumber}>${group.totalExpenses.toFixed(2)}</Text>
+                    <Text style={styles.groupStatLabel}>Total Expenses</Text>
+                  </View>
+                </View>
+
+                <View style={styles.groupFooter}>
+                  <Text style={styles.groupActivity}>{group.recentActivity}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
+                </View>
+
+                <View style={styles.groupMembers}>
+                  {group.members.slice(0, 4).map((member, index) => (
+                    <View key={member.id} style={[styles.memberAvatar, { zIndex: 4 - index }]}>
+                      <Text style={styles.memberInitial}>
+                        {member.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                      </Text>
+                    </View>
+                  ))}
+                  {group.members.length > 4 && (
+                    <View style={styles.memberCount}>
+                      <Text style={styles.memberCountText}>+{group.members.length - 4}</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ))}
           </>
         ) : searchQuery.length > 0 ? (
           <View style={styles.emptyState}>
@@ -237,10 +372,7 @@ export default function Page() {
 }
 
 // TODO: Database queries needed:
-// - getUserGroups(userId) - get all groups user belongs to
 // - createGroup(groupData) - create new group
 // - joinGroup(userId, inviteCode) - join group via invite code
 // - leaveGroup(userId, groupId) - leave a group
 // - updateGroup(groupId, updates) - update group details
-// - getGroupExpenseSummary(groupId) - get total expenses for group
-// - getGroupRecentActivity(groupId) - get recent group activity

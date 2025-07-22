@@ -6,7 +6,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view
 import { styles } from '@/assets/styles/auth.styles.js'
 import { Ionicons } from '@expo/vector-icons'
 import { COLORS } from '@/constants/colors'
-
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export default function Page() {
   const { signIn, setActive, isLoaded } = useSignIn()
@@ -15,6 +15,39 @@ export default function Page() {
   const [emailAddress, setEmailAddress] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+
+  // Function to authenticate with backend and store user UUID
+  const authenticateWithBackend = async (email) => {
+    try {
+      const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.API_BASE_URL
+      
+      if (!baseUrl) {
+        console.error('Base URL not found in environment variables')
+        return null
+      }
+
+      const response = await fetch(`${baseUrl}/auth`, {
+        method: 'GET',
+        headers: {
+          'authorization': `bearer ${email}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const userUUID = await response.text() // Assuming the UUID is returned as plain text
+        await AsyncStorage.setItem('userUUID', userUUID)
+        console.log('User UUID saved:', userUUID)
+        return userUUID
+      } else {
+        console.error('Backend authentication failed:', response.status)
+        return null
+      }
+    } catch (error) {
+      console.error('Error authenticating with backend:', error)
+      return null
+    }
+  }
 
   // Handle the submission of the sign-in form
   const onSignInPress = async () => {
@@ -31,7 +64,15 @@ export default function Page() {
       // and redirect the user
       if (signInAttempt.status === 'complete') {
         await setActive({ session: signInAttempt.createdSessionId })
-        router.replace('/')
+        
+        // Authenticate with backend and save user UUID
+        const userUUID = await authenticateWithBackend(emailAddress)
+        
+        if (userUUID) {
+          router.replace('/')
+        } else {
+          setError("Authentication successful, but failed to connect to backend.")
+        }
       } else {
         // If the status isn't complete, check why. User might need to
         // complete further steps.
