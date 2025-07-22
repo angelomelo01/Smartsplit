@@ -12,15 +12,11 @@ export default function Page() {
   const { user } = useUser()
 
   const [userBalances, setUserBalances] = useState([])
+  const [recentExpenses, setRecentExpenses] = useState([])
   const [loading, setLoading] = useState(true)
+  const [expensesLoading, setExpensesLoading] = useState(true)
   const [error, setError] = useState('')
-  
-  // TODO: Replace with actual database queries
-  const recentExpenses = [
-    { id: 1, description: "Dinner at Pizza Place", amount: 45.60, date: "Today", paidBy: "You" },
-    { id: 2, description: "Uber ride", amount: 18.30, date: "Yesterday", paidBy: "John" },
-    { id: 3, description: "Groceries", amount: 127.85, date: "2 days ago", paidBy: "Sarah" }
-  ]
+  const [expensesError, setExpensesError] = useState('')
 
   // Fetch user balances from backend
   const fetchUserBalances = async () => {
@@ -67,9 +63,55 @@ export default function Page() {
     }
   }
 
-  // Fetch balances when component mounts
+  // Fetch recent expenses from backend
+  const fetchRecentExpenses = async () => {
+    try {
+      setExpensesLoading(true)
+      setExpensesError('')
+      
+      // Get user UUID from AsyncStorage
+      const userUUID = await AsyncStorage.getItem('userUUID')
+      
+      if (!userUUID) {
+        setExpensesError('User not authenticated. Please sign in again.')
+        return
+      }
+
+      const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.API_BASE_URL
+      
+      if (!baseUrl) {
+        setExpensesError('Server configuration error. Please try again later.')
+        return
+      }
+
+      const response = await fetch(`${baseUrl}/recent-expense/${userUUID}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const expenses = await response.json()
+        setRecentExpenses(expenses)
+      } else if (response.status === 404) {
+        // No recent expenses found - this is normal for new users
+        setRecentExpenses([])
+      } else {
+        setExpensesError(`Failed to load recent expenses: ${response.status}`)
+      }
+    } catch (error) {
+      console.error('Error fetching recent expenses:', error)
+      setExpensesError('Network error. Please check your connection and try again.')
+    } finally {
+      setExpensesLoading(false)
+    }
+  }
+
+  // Fetch both balances and expenses when component mounts
   useEffect(() => {
     fetchUserBalances()
+    fetchRecentExpenses()
   }, [])
 
   const totalYouOwe = userBalances
@@ -141,6 +183,41 @@ export default function Page() {
       <View style={styles.emptyState}>
         <Ionicons name="checkmark-circle" size={48} color={COLORS.success} />
         <Text style={styles.emptyStateText}>You're all settled up!</Text>
+      </View>
+    )
+  }
+
+  // Show loading/error state for recent expenses section
+  const renderRecentExpensesContent = () => {
+    if (expensesLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading recent expenses...</Text>
+        </View>
+      )
+    }
+
+    if (expensesError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={24} color={COLORS.expense} />
+          <Text style={styles.errorText}>{expensesError}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchRecentExpenses}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )
+    }
+
+    if (recentExpenses.length > 0) {
+      return recentExpenses.map(renderExpenseItem)
+    }
+
+    return (
+      <View style={styles.emptyState}>
+        <Ionicons name="receipt-outline" size={48} color={COLORS.textLight} />
+        <Text style={styles.emptyStateText}>No recent expenses</Text>
       </View>
     )
   }
@@ -225,7 +302,7 @@ export default function Page() {
           </TouchableOpacity>
         </View>
         
-        {recentExpenses.map(renderExpenseItem)}
+        {renderRecentExpensesContent()}
       </View>
     </ScrollView>
   )
