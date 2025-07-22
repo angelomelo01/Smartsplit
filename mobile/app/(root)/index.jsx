@@ -1,26 +1,76 @@
-import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useUser } from '@clerk/clerk-expo'
 import { Ionicons } from '@expo/vector-icons'
-import { styles } from '@/assets/styles/index.styles.js' // You'll need to create this
+import { styles } from '@/assets/styles/index.styles.js'
 import { COLORS } from '@/constants/colors'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export default function Page() {
   const router = useRouter()
   const { user } = useUser()
 
-  // TODO: Replace with actual database queries
-  const userBalances = [
-    { id: 1, name: "John Doe", amount: 25.50, type: "owes_you" },
-    { id: 2, name: "Sarah Smith", amount: -15.75, type: "you_owe" },
-    { id: 3, name: "Mike Johnson", amount: 8.25, type: "owes_you" }
-  ]
+  const [userBalances, setUserBalances] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   
+  // TODO: Replace with actual database queries
   const recentExpenses = [
     { id: 1, description: "Dinner at Pizza Place", amount: 45.60, date: "Today", paidBy: "You" },
     { id: 2, description: "Uber ride", amount: 18.30, date: "Yesterday", paidBy: "John" },
     { id: 3, description: "Groceries", amount: 127.85, date: "2 days ago", paidBy: "Sarah" }
   ]
+
+  // Fetch user balances from backend
+  const fetchUserBalances = async () => {
+    try {
+      setLoading(true)
+      setError('')
+      
+      // Get user UUID from AsyncStorage
+      const userUUID = await AsyncStorage.getItem('userUUID')
+      
+      if (!userUUID) {
+        setError('User not authenticated. Please sign in again.')
+        return
+      }
+
+      const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.API_BASE_URL
+      
+      if (!baseUrl) {
+        setError('Server configuration error. Please try again later.')
+        return
+      }
+
+      const response = await fetch(`${baseUrl}/balances/${userUUID}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const balances = await response.json()
+        setUserBalances(balances)
+      } else if (response.status === 404) {
+        // No balances found - this is normal for new users
+        setUserBalances([])
+      } else {
+        setError(`Failed to load balances: ${response.status}`)
+      }
+    } catch (error) {
+      console.error('Error fetching user balances:', error)
+      setError('Network error. Please check your connection and try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fetch balances when component mounts
+  useEffect(() => {
+    fetchUserBalances()
+  }, [])
 
   const totalYouOwe = userBalances
     .filter(balance => balance.type === "you_owe")
@@ -60,6 +110,41 @@ export default function Page() {
     </TouchableOpacity>
   )
 
+  // Show loading state for balances section
+  const renderBalancesContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading balances...</Text>
+        </View>
+      )
+    }
+
+    if (error) {
+      return (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={24} color={COLORS.expense} />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchUserBalances}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )
+    }
+
+    if (userBalances.length > 0) {
+      return userBalances.slice(0, 3).map(renderBalanceItem)
+    }
+
+    return (
+      <View style={styles.emptyState}>
+        <Ionicons name="checkmark-circle" size={48} color={COLORS.success} />
+        <Text style={styles.emptyStateText}>You're all settled up!</Text>
+      </View>
+    )
+  }
+
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
@@ -81,13 +166,13 @@ export default function Page() {
         <View style={[styles.summaryCard, styles.oweCard]}>
           <Text style={styles.summaryLabel}>You owe</Text>
           <Text style={[styles.summaryAmount, { color: COLORS.expense }]}>
-            ${totalYouOwe.toFixed(2)}
+            ${loading ? '...' : totalYouOwe.toFixed(2)}
           </Text>
         </View>
         <View style={[styles.summaryCard, styles.owedCard]}>
           <Text style={styles.summaryLabel}>You're owed</Text>
           <Text style={[styles.summaryAmount, { color: COLORS.income }]}>
-            ${totalOwedToYou.toFixed(2)}
+            ${loading ? '...' : totalOwedToYou.toFixed(2)}
           </Text>
         </View>
       </View>
@@ -128,14 +213,7 @@ export default function Page() {
           </TouchableOpacity>
         </View>
         
-        {userBalances.length > 0 ? (
-          userBalances.slice(0, 3).map(renderBalanceItem)
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="checkmark-circle" size={48} color={COLORS.success} />
-            <Text style={styles.emptyStateText}>You're all settled up!</Text>
-          </View>
-        )}
+        {renderBalancesContent()}
       </View>
 
       {/* Recent Expenses */}
@@ -154,7 +232,4 @@ export default function Page() {
 }
 
 // TODO: Database queries needed:
-// - getUserBalances(userId) - get all outstanding balances for user
 // - getRecentExpenses(userId, limit) - get recent expenses involving user
-// - getTotalOwed(userId) - calculate total amount user owes
-// - getTotalOwedToUser(userId) - calculate total amount owed to user

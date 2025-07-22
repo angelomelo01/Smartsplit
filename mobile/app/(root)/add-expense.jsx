@@ -151,7 +151,7 @@ export default function Page() {
           'participants': JSON.stringify(expenseData.participants),
           'splitType': expenseData.splitType,
           'category': expenseData.category,
-          'paidBy': expenseData.paidBy,
+          'paidBy': userUUID,
           'createdBy': expenseData.createdBy,
           'createdAt': expenseData.createdAt
         },
