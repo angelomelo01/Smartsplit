@@ -181,7 +181,16 @@ def add_expense(user_id:str, expense:dict):
     db.table('expense').insert(
         expense
     )
+    
+    # Update group
+    group = db.table('group').search(Query().id == expense['groupId'])[0]
+    total_expenses = group['totalExpenses']
+    db.table('group').update(
+        cond= Query().id == expense['groupId'],
+        fields= {'totalExpenses' : total_expenses + float(expense['amount'])}
+    )
 
+    # Update participants
     for p in expense['participants']:
         user = db.table('user').search(Query().id == p)[0]
         expense_list:list = user.get('expense_id_list')

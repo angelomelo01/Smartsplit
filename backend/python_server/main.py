@@ -66,7 +66,8 @@ async def add_expense(user_id:str, request:fap.requests.Request):
         'category': request.headers.get('category'),
         'paidBy': request.headers.get('paidBy'),
         'createdBy': request.headers.get('createdBy'),
-        'createdAt': request.headers.get('createdAt')
+        'createdAt': request.headers.get('createdAt'),
+        'isSettled' : False
     }
     utils.add_expense(user_id.replace('"', ''), expense)
 
