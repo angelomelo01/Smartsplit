@@ -45,9 +45,13 @@ def setup_user_dir(email: str) -> os.PathLike:
                 'uuid' : uid,
                 'id' : uid,
                 'name' : email.split('@')[0],
-                'groups' : []
+                'groups' : [],
+                'expense_id_list' : []
             }
         )
+        with open(os.path.join(user_dir, email.split('@')[0]), 'w') as stream:
+            stream.write('')
+            
     else:
         user_dir = records[0].get('data_dir')
 
@@ -282,7 +286,7 @@ def process_all_expenses(user_id):
     db = TinyDB(USER_DATA_DB_PATH)
     user = db.table('user').search(Query().id == user_id)[0]
     expense_id_list = user.get('expense_id_list')
-
+    
     all_results = []
     
     for expense_id in expense_id_list:
@@ -427,7 +431,7 @@ if __name__ == '__main__':
       'recent_activity': "Added 'Hotel booking' expense 1 week ago"
     }
 
-    # rv = create_group(my_uuid, new_group)
+    rv = create_group(my_uuid, new_group)
 
     pp(
         process_all_expenses(my_uuid)

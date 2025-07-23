@@ -1,87 +1,110 @@
-import { useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useUser } from '@clerk/clerk-expo'
 import { Ionicons } from '@expo/vector-icons'
-import { styles } from '@/assets/styles/settle.styles.js' // You'll need to create this
+import { styles } from '@/assets/styles/settle.styles.js'
 import { COLORS } from '@/constants/colors'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export default function Page() {
   const router = useRouter()
   const { user } = useUser()
   
   const [selectedTab, setSelectedTab] = useState('you_owe') // you_owe, owed_to_you
+  const [userBalances, setUserBalances] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  // TODO: Replace with actual database queries
-  const outstandingBalances = {
-    you_owe: [
-      {
-        id: 1,
-        person: { id: "user2", name: "John Doe", email: "john@example.com" },
-        amount: 25.50,
-        expenses: [
-          { id: 1, description: "Dinner at Pizza Place", amount: 15.20 },
-          { id: 2, description: "Coffee", amount: 10.30 }
-        ],
-        lastUpdated: "2024-01-15"
-      },
-      {
-        id: 2,
-        person: { id: "user3", name: "Sarah Smith", email: "sarah@example.com" },
-        amount: 42.75,
-        expenses: [
-          { id: 3, description: "Uber ride", amount: 14.25 },
-          { id: 4, description: "Movie tickets", amount: 28.50 }
-        ],
-        lastUpdated: "2024-01-14"
+  // Fetch user balances from backend (same as index.jsx)
+  const fetchUserBalances = async () => {
+    try {
+      setLoading(true)
+      setError('')
+      
+      // Get user UUID from AsyncStorage
+      const userUUID = await AsyncStorage.getItem('userUUID')
+      
+      if (!userUUID) {
+        setError('User not authenticated. Please sign in again.')
+        return
       }
-    ],
-    owed_to_you: [
-      {
-        id: 3,
-        person: { id: "user4", name: "Mike Johnson", email: "mike@example.com" },
-        amount: 18.60,
-        expenses: [
-          { id: 5, description: "Groceries", amount: 18.60 }
-        ],
-        lastUpdated: "2024-01-13"
-      },
-      {
-        id: 4,
-        person: { id: "user5", name: "Lisa Brown", email: "lisa@example.com" },
-        amount: 67.20,
-        expenses: [
-          { id: 6, description: "Hotel booking", amount: 50.00 },
-          { id: 7, description: "Restaurant bill", amount: 17.20 }
-        ],
-        lastUpdated: "2024-01-12"
+
+      const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.API_BASE_URL
+      
+      if (!baseUrl) {
+        setError('Server configuration error. Please try again later.')
+        return
       }
-    ]
+
+      const response = await fetch(`${baseUrl}/balances/${userUUID}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const balances = await response.json()
+        setUserBalances(balances)
+      } else if (response.status === 404) {
+        // No balances found - this is normal for new users
+        setUserBalances([])
+      } else {
+        setError(`Failed to load balances: ${response.status}`)
+      }
+    } catch (error) {
+      console.error('Error fetching user balances:', error)
+      setError('Network error. Please check your connection and try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const currentBalances = outstandingBalances[selectedTab]
-  
-  const totalYouOwe = outstandingBalances.you_owe.reduce((sum, balance) => sum + balance.amount, 0)
-  const totalOwedToYou = outstandingBalances.owed_to_you.reduce((sum, balance) => sum + balance.amount, 0)
+  // Fetch balances when component mounts
+  useEffect(() => {
+    fetchUserBalances()
+  }, [])
 
-  const handleSettleUp = (balance) => {
+  // Group balances by type
+  const youOweBalances = userBalances.filter(balance => balance.type === "you_owe")
+  const owedToYouBalances = userBalances.filter(balance => balance.type === "owes_you")
+  
+  const currentBalances = selectedTab === 'you_owe' ? youOweBalances : owedToYouBalances
+  
+  const totalYouOwe = youOweBalances.reduce((sum, balance) => sum + Math.abs(balance.amount), 0)
+  const totalOwedToYou = owedToYouBalances.reduce((sum, balance) => sum + balance.amount, 0)
+
+  const handleSettleUp = async (balance) => {
     const isOwing = selectedTab === 'you_owe'
     const actionText = isOwing ? 'pay' : 'record payment from'
+    const amount = Math.abs(balance.amount)
     
     Alert.alert(
       'Settle Up',
-      `Do you want to ${actionText} ${balance.person.name} $${balance.amount.toFixed(2)}?`,
+      `Do you want to ${actionText} ${balance.name} $${amount.toFixed(2)}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Record Payment', 
-          onPress: () => {
-            // TODO: Record settlement in database
-            Alert.alert(
-              'Payment Recorded',
-              `Payment of $${balance.amount.toFixed(2)} has been recorded.`,
-              [{ text: 'OK' }]
-            )
+          onPress: async () => {
+            try {
+              // TODO: Implement settlement API call
+              const userUUID = await AsyncStorage.getItem('userUUID')
+              const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.API_BASE_URL
+              
+              // For now, just show success and refresh data
+              Alert.alert(
+                'Payment Recorded',
+                `Payment of $${amount.toFixed(2)} has been recorded.`,
+                [{ 
+                  text: 'OK', 
+                  onPress: () => fetchUserBalances() // Refresh data
+                }]
+              )
+            } catch (error) {
+              Alert.alert('Error', 'Failed to record payment. Please try again.')
+            }
           }
         }
       ]
@@ -91,7 +114,7 @@ export default function Page() {
   const handleSendReminder = (balance) => {
     Alert.alert(
       'Send Reminder',
-      `Send a friendly reminder to ${balance.person.name} about the $${balance.amount.toFixed(2)} they owe you?`,
+      `Send a friendly reminder to ${balance.name} about the $${Math.abs(balance.amount).toFixed(2)} they owe you?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -100,7 +123,7 @@ export default function Page() {
             // TODO: Send reminder notification/email
             Alert.alert(
               'Reminder Sent',
-              `Reminder sent to ${balance.person.name}`,
+              `Reminder sent to ${balance.name}`,
               [{ text: 'OK' }]
             )
           }
@@ -111,6 +134,7 @@ export default function Page() {
 
   const renderBalanceItem = (balance) => {
     const isOwing = selectedTab === 'you_owe'
+    const amount = Math.abs(balance.amount)
     
     return (
       <View key={balance.id} style={styles.balanceItem}>
@@ -118,13 +142,13 @@ export default function Page() {
           <View style={styles.personInfo}>
             <View style={styles.personAvatar}>
               <Text style={styles.personInitial}>
-                {balance.person.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                {balance.name.split(' ').map(n => n[0]).join('').toUpperCase()}
               </Text>
             </View>
             <View style={styles.personDetails}>
-              <Text style={styles.personName}>{balance.person.name}</Text>
+              <Text style={styles.personName}>{balance.name}</Text>
               <Text style={styles.balanceAmount}>
-                {isOwing ? 'You owe' : 'Owes you'} ${balance.amount.toFixed(2)}
+                {isOwing ? 'You owe' : 'Owes you'} ${amount.toFixed(2)}
               </Text>
             </View>
           </View>
@@ -142,15 +166,13 @@ export default function Page() {
           </TouchableOpacity>
         </View>
 
-        {/* Expense Breakdown */}
+        {/* Note: Expense breakdown would require additional API endpoint for expense details */}
         <View style={styles.expenseBreakdown}>
-          <Text style={styles.breakdownTitle}>Breakdown:</Text>
-          {balance.expenses.map(expense => (
-            <View key={expense.id} style={styles.expenseRow}>
-              <Text style={styles.expenseDescription}>{expense.description}</Text>
-              <Text style={styles.expenseAmount}>${expense.amount.toFixed(2)}</Text>
-            </View>
-          ))}
+          <Text style={styles.breakdownTitle}>Balance Details:</Text>
+          <View style={styles.expenseRow}>
+            <Text style={styles.expenseDescription}>Total balance with {balance.name}</Text>
+            <Text style={styles.expenseAmount}>${amount.toFixed(2)}</Text>
+          </View>
         </View>
 
         {/* Additional Actions */}
@@ -178,7 +200,7 @@ export default function Page() {
             onPress={() => {
               Alert.alert(
                 'Partial Settlement',
-                `Record a partial payment ${isOwing ? 'to' : 'from'} ${balance.person.name}?`,
+                `Record a partial payment ${isOwing ? 'to' : 'from'} ${balance.name}?`,
                 [
                   { text: 'Cancel', style: 'cancel' },
                   { text: 'Record Partial', onPress: () => router.push(`/partial-payment/${balance.id}`) }
@@ -192,8 +214,51 @@ export default function Page() {
         </View>
         
         <Text style={styles.lastUpdated}>
-          Last updated {new Date(balance.lastUpdated).toLocaleDateString()}
+          Last updated {balance.updated_at ? new Date(balance.updated_at).toLocaleDateString() : 'Recently'}
         </Text>
+      </View>
+    )
+  }
+
+  // Loading state
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Settle Up</Text>
+          <View style={{width: 24}} />
+        </View>
+        
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading balances...</Text>
+        </View>
+      </View>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Settle Up</Text>
+          <View style={{width: 24}} />
+        </View>
+        
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color={COLORS.expense} />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchUserBalances}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     )
   }
@@ -219,7 +284,7 @@ export default function Page() {
             ${totalYouOwe.toFixed(2)}
           </Text>
           <Text style={styles.summaryCount}>
-            {outstandingBalances.you_owe.length} people
+            {youOweBalances.length} people
           </Text>
         </View>
         
@@ -229,7 +294,7 @@ export default function Page() {
             ${totalOwedToYou.toFixed(2)}
           </Text>
           <Text style={styles.summaryCount}>
-            {outstandingBalances.owed_to_you.length} people
+            {owedToYouBalances.length} people
           </Text>
         </View>
       </View>
@@ -247,7 +312,7 @@ export default function Page() {
             styles.tabText,
             selectedTab === 'you_owe' && styles.activeTabText
           ]}>
-            You Owe ({outstandingBalances.you_owe.length})
+            You Owe ({youOweBalances.length})
           </Text>
         </TouchableOpacity>
         
@@ -262,7 +327,7 @@ export default function Page() {
             styles.tabText,
             selectedTab === 'owed_to_you' && styles.activeTabText
           ]}>
-            Owed to You ({outstandingBalances.owed_to_you.length})
+            Owed to You ({owedToYouBalances.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -307,9 +372,15 @@ export default function Page() {
                   { text: 'Cancel', style: 'cancel' },
                   { 
                     text: 'Settle All', 
-                    onPress: () => {
-                      // TODO: Settle all balances
-                      Alert.alert('Success', 'All balances have been settled!')
+                    onPress: async () => {
+                      try {
+                        // TODO: Implement settle all API call
+                        Alert.alert('Success', 'All balances have been settled!', [
+                          { text: 'OK', onPress: () => fetchUserBalances() }
+                        ])
+                      } catch (error) {
+                        Alert.alert('Error', 'Failed to settle balances. Please try again.')
+                      }
                     }
                   }
                 ]
@@ -326,10 +397,10 @@ export default function Page() {
   )
 }
 
-// TODO: Database queries needed:
-// - getOutstandingBalances(userId) - get all unsettled balances for user
-// - recordSettlement(balanceId, amount, method) - record a settlement
-// - sendPaymentReminder(balanceId) - send reminder to debtor
-// - getSettlementHistory(userId) - get payment history
-// - recordPartialPayment(balanceId, amount) - record partial settlement
-// - calculateOptimalSettlements(userId) - optimize payment chains
+// TODO: Additional API endpoints needed:
+// - POST /settlements - record individual settlements
+// - POST /settlements/bulk - settle multiple balances at once  
+// - GET /balance-details/${balanceId} - get detailed breakdown of balance
+// - POST /reminders - send payment reminders
+// - POST /partial-payments - record partial payments
+// - GET /settlement-history/${userId} - get payment history

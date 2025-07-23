@@ -12,6 +12,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get('/')
+async def root():
+    '''
+    
+    '''
+    return fap.responses.JSONResponse(status_code=200, content='Angelo and Joe - WIT Senior Project 2025')
+
+
 @app.get('/auth')
 async def authorize_user(request: fap.requests.Request) -> str:
     '''
@@ -26,13 +34,12 @@ async def authorize_user(request: fap.requests.Request) -> str:
 
 
 @app.get('/groups/{user_id}')
-async def get_groups(user_id:str, request: fap.requests.Request):
+async def get_groups(user_id:str):
     '''
     '''
     user_id = user_id.replace('"', '')
     groups = utils.get_user_groups(user_id=user_id)
-
-    print(groups)
+    
     return groups
 
 
