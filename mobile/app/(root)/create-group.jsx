@@ -105,7 +105,7 @@ export default function CreateGroup() {
 
       console.log('Creating group with data:', groupData)
 
-      const response = await fetch(`${baseUrl}/groups`, {
+      const response = await fetch(`${baseUrl}/groups/${userUUID}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

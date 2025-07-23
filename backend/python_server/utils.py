@@ -131,12 +131,14 @@ def get_user_groups(user_id:str) -> dict:
     '''
     db = TinyDB(USER_DATA_DB_PATH)
     user = Query()
-    rv = db.table('user').search(user.uuid == user_id)[0]
-
+    rv = db.table('user').search(user.id == user_id)
+    rv = rv[0]
+    
     groups:list[dict] = rv.get('groups')
+    
     group_list = []
-    member_list = []
     for group_id in groups:
+        member_list = []
         group = db.table('group').search(Query().group_id == group_id)[0]
         members = group.get('members')
         for member in members:
@@ -443,23 +445,8 @@ if __name__ == '__main__':
       'created_at': "2024-01-10",
       'recent_activity': "Added 'Hotel booking' expense 1 week ago"
     }
-    
-    """
-    {'createdAt': '2025-07-23T21:23:13.973Z',
-    'createdBy': '567ec4d4-37d5-4d19-be8a-a0d773f56272',
-    'currency': 'USD',
-    'description': 'The weekend fun',
-    'members': [{'email': 'anxhelomelo@icloud.com',
-                'id': '"567ec4d4-37d5-4d19-be8a-a0d773f56272"',
-                'name': 'You',
-                'role': 'admin'},
-                {'email': 'anxhelomelo@icloud.com'}],
-    'name': 'Hello',
-    'recentActivity': 'Group created',
-    'totalExpenses': 0}
-    """
 
-    rv = create_group(my_uuid, new_group)
+    # rv = create_group(my_uuid, new_group)
 
     pp(
         process_all_expenses(my_uuid)
@@ -468,3 +455,5 @@ if __name__ == '__main__':
     pp(
         get_formatted_recent_expenses(my_uuid)
     )
+    
+    get_user_groups('3df55806-3ad2-4c9d-aaad-61a42a03d032')
