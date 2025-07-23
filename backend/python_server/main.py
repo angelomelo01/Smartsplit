@@ -1,6 +1,7 @@
 import fastapi as fap
 from fastapi.middleware.cors import CORSMiddleware
 import utils 
+import json
 
 app = fap.FastAPI()
 
@@ -41,6 +42,17 @@ async def get_groups(user_id:str):
     groups = utils.get_user_groups(user_id=user_id)
     
     return groups
+
+
+@app.post('/groups/{user_id}')
+async def add_group(user_id:str, request:fap.requests.Request):
+    '''
+    '''
+    user_id = user_id.replace('"', '')
+    body:bytes = await request.body()
+    group = json.loads(body)
+    rv = utils.create_group(user_id=user_id, new_group_data=group)
+    return fap.responses.JSONResponse(status_code=200, content=rv)
 
 
 @app.post('/expense/{user_id}')

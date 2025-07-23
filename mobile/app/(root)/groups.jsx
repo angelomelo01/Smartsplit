@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { useUser } from '@clerk/clerk-expo'
 import { Ionicons } from '@expo/vector-icons'
 import { styles } from '@/assets/styles/groups.styles.js'
 import { COLORS } from '@/constants/colors'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useCallback } from 'react'
 
 export default function Page() {
   const router = useRouter()
@@ -67,6 +68,13 @@ export default function Page() {
     fetchUserGroups()
   }, [])
 
+  // Refresh groups when screen comes into focus (after creating/editing groups)
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserGroups()
+    }, [])
+  )
+
   // Retry function for error states
   const handleRetry = () => {
     fetchUserGroups()
@@ -78,7 +86,6 @@ export default function Page() {
   )
 
   const handleCreateGroup = () => {
-    // TODO: Navigate to create group page or show modal
     router.push('/create-group')
   }
 
@@ -93,8 +100,46 @@ export default function Page() {
     )
   }
 
+  const handleLeaveGroup = async (groupId, groupName) => {
+    try {
+      const userUUID = await AsyncStorage.getItem('userUUID')
+      
+      if (!userUUID) {
+        Alert.alert('Error', 'User not authenticated. Please sign in again.')
+        return
+      }
+
+      const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.API_BASE_URL
+      
+      if (!baseUrl) {
+        Alert.alert('Error', 'Server configuration error. Please try again later.')
+        return
+      }
+
+      const response = await fetch(`${baseUrl}/groups/${groupId}/leave`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: userUUID })
+      })
+
+      if (response.ok) {
+        Alert.alert('Success', `You have left ${groupName}`)
+        fetchUserGroups() // Refresh the groups list
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        Alert.alert('Error', errorData.message || 'Failed to leave group')
+      }
+    } catch (error) {
+      console.error('Error leaving group:', error)
+      Alert.alert('Error', 'Network error. Please try again.')
+    }
+  }
+
   const renderGroupItem = (group) => (
     <TouchableOpacity 
+      key={group.id}
       style={styles.groupItem}
       onPress={() => router.push(`/group/${group.id}`)}
     >
@@ -122,8 +167,7 @@ export default function Page() {
                     [
                       { text: 'Cancel', style: 'cancel' },
                       { text: 'Leave', style: 'destructive', onPress: () => {
-                        // TODO: Leave group logic
-                        console.log('Leave group:', group.id)
+                        handleLeaveGroup(group.id, group.name)
                       }}
                     ]
                   )
@@ -139,29 +183,29 @@ export default function Page() {
 
       <View style={styles.groupStats}>
         <View style={styles.groupStat}>
-          <Text style={styles.groupStatNumber}>{group.members.length}</Text>
+          <Text style={styles.groupStatNumber}>{group.members?.length || 0}</Text>
           <Text style={styles.groupStatLabel}>Members</Text>
         </View>
         <View style={styles.groupStat}>
-          <Text style={styles.groupStatNumber}>${group.totalExpenses.toFixed(2)}</Text>
+          <Text style={styles.groupStatNumber}>${(group.totalExpenses || 0).toFixed(2)}</Text>
           <Text style={styles.groupStatLabel}>Total Expenses</Text>
         </View>
       </View>
 
       <View style={styles.groupFooter}>
-        <Text style={styles.groupActivity}>{group.recentActivity}</Text>
+        <Text style={styles.groupActivity}>{group.recentActivity || 'No recent activity'}</Text>
         <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
       </View>
 
       <View style={styles.groupMembers}>
-        {group.members.slice(0, 4).map((member, index) => (
-          <View key={member.id} style={[styles.memberAvatar, { zIndex: 4 - index }]}>
+        {group.members?.slice(0, 4).map((member, index) => (
+          <View key={member.id || index} style={[styles.memberAvatar, { zIndex: 4 - index }]}>
             <Text style={styles.memberInitial}>
-              {member.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+              {member.name ? member.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
             </Text>
           </View>
         ))}
-        {group.members.length > 4 && (
+        {group.members && group.members.length > 4 && (
           <View style={styles.memberCount}>
             <Text style={styles.memberCountText}>+{group.members.length - 4}</Text>
           </View>
@@ -268,83 +312,7 @@ export default function Page() {
             <Text style={styles.sectionTitle}>
               Your Groups ({filteredGroups.length})
             </Text>
-            {filteredGroups.map(group => (
-              <TouchableOpacity 
-                key={group.id}
-                style={styles.groupItem}
-                onPress={() => router.push(`/group/${group.id}`)}
-              >
-                <View style={styles.groupHeader}>
-                  <View style={styles.groupIcon}>
-                    <Ionicons name="people" size={24} color={COLORS.primary} />
-                  </View>
-                  <View style={styles.groupInfo}>
-                    <Text style={styles.groupName}>{group.name}</Text>
-                    <Text style={styles.groupDescription}>{group.description}</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.groupMenuButton}
-                    onPress={() => {
-                      Alert.alert(
-                        'Group Options',
-                        `Options for ${group.name}`,
-                        [
-                          { text: 'View Details', onPress: () => router.push(`/group/${group.id}`) },
-                          { text: 'Edit Group', onPress: () => router.push(`/group/${group.id}/edit`) },
-                          { text: 'Leave Group', style: 'destructive', onPress: () => {
-                            Alert.alert(
-                              'Leave Group',
-                              `Are you sure you want to leave ${group.name}?`,
-                              [
-                                { text: 'Cancel', style: 'cancel' },
-                                { text: 'Leave', style: 'destructive', onPress: () => {
-                                  // TODO: Leave group logic
-                                  console.log('Leave group:', group.id)
-                                }}
-                              ]
-                            )
-                          }},
-                          { text: 'Cancel', style: 'cancel' }
-                        ]
-                      )
-                    }}
-                  >
-                    <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textLight} />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.groupStats}>
-                  <View style={styles.groupStat}>
-                    <Text style={styles.groupStatNumber}>{group.members.length}</Text>
-                    <Text style={styles.groupStatLabel}>Members</Text>
-                  </View>
-                  <View style={styles.groupStat}>
-                    <Text style={styles.groupStatNumber}>${group.totalExpenses.toFixed(2)}</Text>
-                    <Text style={styles.groupStatLabel}>Total Expenses</Text>
-                  </View>
-                </View>
-
-                <View style={styles.groupFooter}>
-                  <Text style={styles.groupActivity}>{group.recentActivity}</Text>
-                  <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
-                </View>
-
-                <View style={styles.groupMembers}>
-                  {group.members.slice(0, 4).map((member, index) => (
-                    <View key={member.id} style={[styles.memberAvatar, { zIndex: 4 - index }]}>
-                      <Text style={styles.memberInitial}>
-                        {member.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                      </Text>
-                    </View>
-                  ))}
-                  {group.members.length > 4 && (
-                    <View style={styles.memberCount}>
-                      <Text style={styles.memberCountText}>+{group.members.length - 4}</Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
+            {filteredGroups.map(renderGroupItem)}
           </>
         ) : searchQuery.length > 0 ? (
           <View style={styles.emptyState}>
@@ -372,7 +340,5 @@ export default function Page() {
 }
 
 // TODO: Database queries needed:
-// - createGroup(groupData) - create new group
 // - joinGroup(userId, inviteCode) - join group via invite code
-// - leaveGroup(userId, groupId) - leave a group
 // - updateGroup(groupId, updates) - update group details

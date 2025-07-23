@@ -72,10 +72,23 @@ def create_group(user_id:str, new_group_data:dict):
     db = TinyDB(USER_DATA_DB_PATH)
     use_query = Query()
     user = db.table('user').search(use_query.uuid == user_id)[0]
+    
+    # Sanitize group data
+    for k in new_group_data.keys():
+        if isinstance(new_group_data[k], str):
+            new_group_data[k] = new_group_data[k].replace('"', '')
+        if isinstance(new_group_data[k], list):
+            newList = []
+            for i in new_group_data[k]:
+                if isinstance(i, str):
+                    newList.append(i.replace('"', ''))
+                else:
+                    newList.append(i)
 
     new_group_data.get('members').append({
         'email' : user.get('email')
     })
+    pp(new_group_data)
 
     new_id =  uuid.uuid4().__str__()
     new_group = {
@@ -110,7 +123,7 @@ def create_group(user_id:str, new_group_data:dict):
             fields= {'groups' : group_id_list}
         )
 
-    return None
+    return new_id
 
 
 def get_user_groups(user_id:str) -> dict:
@@ -427,9 +440,24 @@ if __name__ == '__main__':
         { 'email' : "tom@example.com" }
       ],
       'created_by': "user4",
-      'createcreated_atdAt': "2024-01-10",
+      'created_at': "2024-01-10",
       'recent_activity': "Added 'Hotel booking' expense 1 week ago"
     }
+    
+    """
+    {'createdAt': '2025-07-23T21:23:13.973Z',
+    'createdBy': '567ec4d4-37d5-4d19-be8a-a0d773f56272',
+    'currency': 'USD',
+    'description': 'The weekend fun',
+    'members': [{'email': 'anxhelomelo@icloud.com',
+                'id': '"567ec4d4-37d5-4d19-be8a-a0d773f56272"',
+                'name': 'You',
+                'role': 'admin'},
+                {'email': 'anxhelomelo@icloud.com'}],
+    'name': 'Hello',
+    'recentActivity': 'Group created',
+    'totalExpenses': 0}
+    """
 
     rv = create_group(my_uuid, new_group)
 
