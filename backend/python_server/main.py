@@ -86,23 +86,12 @@ async def add_expense(user_id:str, request:fap.requests.Request):
 @app.post('/settle/{user_id}/{expense_id}')
 async def settle_expense(user_id:str, expense_id:str, request: fap.requests.Request):
     '''
-    {
-        "amount": 25.50,
-        "settled_with": "other_user_id_or_name",
-        "settlement_date": "2025-01-23",
-        "notes": "Settlement between User and John Doe",
-        "type": "payment_made" // or "payment_received"
-    }
     '''
     user_id = user_id.replace('"', '')
     expense_id = expense_id.replace('"', '')
-    print(f'expense_id: {expense_id}')
-    print(f'user_id: {user_id}')
-    body:bytes = await request.body()
-    settled_expense = json.loads(body)
+    
     rv = utils.settle_expense(
-        expense_data=settled_expense,
-        expense_id = expense_id
+        user_id = user_id
     ) 
     return None
 
@@ -121,7 +110,17 @@ async def get_recent_expenses(user_id: str):
     '''
     user_id = user_id.replace('"', '')
     rv = utils.get_all_expenses(user_id=user_id)
+    rv = [r for r in rv if not r.get('isSettled')]
     return rv 
+
+@app.get('/group/{group_id}/expenses')
+async def get_gropu_expenses(group_id:str):
+    '''
+    '''
+    group_id = group_id.replace('"', '')
+    rv = utils.get_group_expenses(group_id)
+    
+    return rv
 
 
 @app.get('/join-group/{user_id}/{group_alias}')

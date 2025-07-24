@@ -3,7 +3,7 @@ import shutil
 import json
 import uuid
 import datetime
-from tinydb import TinyDB, Query
+from tinydb import TinyDB, Query, where
 from pprint import pprint as pp 
 
 ####################################################################################################
@@ -322,6 +322,8 @@ def process_all_expenses(user_id):
     
     for expense_id in expense_id_list:
         expense = db.table('expense').search(Query().id == expense_id)[0]
+        if expense.get('isSettled'): continue
+
         balance = expense['amount']
         paid_by = expense['paidBy']
         participants = expense['participants']
@@ -369,8 +371,6 @@ def get_all_expenses(user_id:str):
     consolidated = consolidate_expense_results(all_results)
 
     named_result = []
-    pp(expense_id_list)
-    pp(consolidated)
     for idx, result in enumerate(consolidated):
         user_name = db.table('user').search(Query().id == result['id'])[0].get('name')
         result['name'] = user_name
@@ -380,6 +380,45 @@ def get_all_expenses(user_id:str):
         )
     
     return named_result
+
+
+def get_group_expenses(group_id:str):
+    """
+    Process all expenses and return consolidated results
+    """
+    db = TinyDB(USER_DATA_DB_PATH)
+    group_data = db.table('group').search(Query().id == group_id)[0]
+    members = group_data.get('members')
+    
+    # Get expense for this group
+    all_results = []
+    expense_id_list = []
+    expense_data_list = db.table('expense').search(Query().groupId == group_data['id'])
+    for expense in expense_data_list:
+        expense_id_list.append(expense['id'])
+        balance = expense['amount']
+        paid_by = expense['paidBy']
+        participants = expense['participants']
+        split_method = expense['splitType']
+        
+        if split_method == 'equal':
+            split_result = calculate_equal_split(balance, paid_by, participants, expense['createdBy'])
+            all_results.append(split_result)
+        
+    # Consolidate all results
+    consolidated = consolidate_expense_results(all_results)
+
+    named_result = []
+    for idx, result in enumerate(consolidated):
+        user_name = db.table('user').search(Query().id == result['id'])[0].get('name')
+        result['name'] = user_name
+        result['id'] = expense_id_list[idx]
+        named_result.append(
+            result
+        )
+    
+    return named_result
+    
 
 
 def format_expense_for_display(expense, current_user_id, name=None):
@@ -475,21 +514,35 @@ def get_formatted_recent_expenses(current_user_id, limit=3):
     return formatted_expenses
 
 
-def settle_expense(expense_id: str, expense_data:dict):
+def settle_expense(user_id:str):
     '''
     '''
     db = TinyDB(USER_DATA_DB_PATH)
-    expense = db.table('expense').search(Query().id == expense_id)[0]
-    
-    for new_key in expense_data.keys():
-        if 'amount' in new_key: continue
-        expense[new_key] = expense_data[new_key]
-    expense['amount'] = float(expense['amount']) - float(expense_data['amount'])
-    if expense['amount'] <= 0:
-        expense['isSettled'] = True
-    db.table('expense').update(
-        cond=Query().id == expense_id,
-        fields=expense
+    results = db.table('expense').search(where('participants').any([user_id]))
+    if not results:return
+
+    user_data = db.table('user').search(Query().id == user_id)[0]
+
+    # Update expense    
+    rm_expense_list = []
+    for expense in results:
+        rm_expense_list.append(expense['id'])
+        expense['amount'] = float(expense['amount']) / len(expense['participants'])
+        expense['participants'] = list(expense['participants'])
+        expense['participants'].remove(user_id)
+        db.table('expense').update(
+            cond=Query().id == expense['id'],
+            fields=expense
+        )
+
+    # Update user
+    print(f'user_data[expense_id_list]: {user_data['expense_id_list']}')
+    for exp_id in rm_expense_list:
+        print(f'exp_id: {exp_id}')
+        user_data['expense_id_list'].remove(exp_id)
+    db.table('user').update(
+        cond=Query().id == user_id,
+        fields=user_data
     )
     return None
 
@@ -530,36 +583,33 @@ def join_group(user_id:str, group_doc_id:str):
 
 if __name__ == '__main__':
     my_email = 'anxhelomelo@icloud.com'
-
     setup_user_dir('mike@example.com')
-    setup_user_dir('lisa@example.com')
-    setup_user_dir('tom@example.com')
     setup_user_dir(my_email)
     
-    my_uuid = get_user_info(my_email).get('uuid')
-    print(f'my_uuid: {my_uuid}')
+    # my_uuid = get_user_info(my_email).get('uuid')
+    # print(f'my_uuid: {my_uuid}')
 
-    new_group = {
-      'name': "Trip to Vegas",
-      'description': "Bachelor party expenses",
-      'members': [
-        { 'email' : "mike@example.com" },
-        { 'email' : "lisa@example.com" },
-        { 'email' : "tom@example.com" }
-      ],
-      'created_by': "user4",
-      'created_at': "2024-01-10",
-      'recent_activity': "Added 'Hotel booking' expense 1 week ago"
-    }
+    # new_group = {
+    #   'name': "Trip to Vegas",
+    #   'description': "Bachelor party expenses",
+    #   'members': [
+    #     { 'email' : "mike@example.com" },
+    #     { 'email' : "lisa@example.com" },
+    #     { 'email' : "tom@example.com" }
+    #   ],
+    #   'created_by': "user4",
+    #   'created_at': "2024-01-10",
+    #   'recent_activity': "Added 'Hotel booking' expense 1 week ago"
+    # }
 
-    # rv = create_group(my_uuid, new_group)
+    # # rv = create_group(my_uuid, new_group)
 
-    pp(
-        process_all_expenses(my_uuid)
-    )
+    # pp(
+    #     process_all_expenses(my_uuid)
+    # )
 
-    pp(
-        get_formatted_recent_expenses(my_uuid)
-    )
+    # pp(
+    #     get_formatted_recent_expenses(my_uuid)
+    # )
     
-    get_user_groups('3df55806-3ad2-4c9d-aaad-61a42a03d032')
+    # get_user_groups('3df55806-3ad2-4c9d-aaad-61a42a03d032')
