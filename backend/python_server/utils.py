@@ -502,9 +502,6 @@ def get_formatted_recent_expenses(current_user_id, limit=3):
     # Get recent expenses for the user
     recent_expenses = get_three_most_recent_expenses_simple(db, current_user_id)
     
-    # Get user table for name lookups
-    user_table = db.table('user')
-    
     # Format each expense
     formatted_expenses = []
     for expense in recent_expenses[:limit]:
