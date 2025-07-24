@@ -15,6 +15,7 @@ export default function Page() {
   const [userBalances, setUserBalances] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [settlingBalance, setSettlingBalance] = useState(null) // Track which balance is being settled
 
   // Fetch user balances from backend (same as index.jsx)
   const fetchUserBalances = async () => {
@@ -37,7 +38,7 @@ export default function Page() {
         return
       }
 
-      const response = await fetch(`${baseUrl}/balances/${userUUID}`, {
+      const response = await fetch(`${baseUrl}/expense/${userUUID}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -89,21 +90,72 @@ export default function Page() {
           text: 'Record Payment', 
           onPress: async () => {
             try {
-              // TODO: Implement settlement API call
+              setSettlingBalance(balance.id) // Show loading for this specific balance
+              
               const userUUID = await AsyncStorage.getItem('userUUID')
+              
+              if (!userUUID) {
+                Alert.alert('Error', 'User not authenticated. Please sign in again.')
+                return
+              }
+
               const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.API_BASE_URL
               
-              // For now, just show success and refresh data
-              Alert.alert(
-                'Payment Recorded',
-                `Payment of $${amount.toFixed(2)} has been recorded.`,
-                [{ 
-                  text: 'OK', 
-                  onPress: () => fetchUserBalances() // Refresh data
-                }]
-              )
+              if (!baseUrl) {
+                Alert.alert('Error', 'Server configuration error. Please try again later.')
+                return
+              }
+
+              // Get expense_id from balance object - adjust this based on your data structure
+              const expenseId = balance.expense_id || balance.id
+              
+              if (!expenseId) {
+                Alert.alert('Error', 'Unable to identify expense for settlement.')
+                return
+              }
+
+              console.log(`Making settlement request to: ${baseUrl}/settle/${userUUID}/${expenseId}`)
+
+              // Make POST request to settle endpoint
+              const response = await fetch(`${baseUrl}/settle/${userUUID}/${expenseId}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  amount: amount,
+                  settled_with: balance.user_id || balance.other_user_id || balance.name,
+                  settlement_date: new Date().toISOString().split('T')[0], // Format as YYYY-MM-DD
+                  notes: `Settlement between ${user?.fullName || user?.firstName || 'user'} and ${balance.name}`,
+                  type: isOwing ? 'payment_made' : 'payment_received'
+                })
+              })
+
+              if (response.ok) {
+                const result = await response.json()
+                console.log('Settlement recorded:', result)
+                
+                Alert.alert(
+                  'Payment Recorded',
+                  `Payment of $${amount.toFixed(2)} has been recorded successfully.`,
+                  [{ 
+                    text: 'OK', 
+                    onPress: () => fetchUserBalances() // Refresh data
+                  }]
+                )
+              } else {
+                const errorData = await response.json().catch(() => ({}))
+                console.error('Settlement error:', response.status, errorData)
+                Alert.alert(
+                  'Error', 
+                  errorData.message || errorData.error || `Failed to record settlement: ${response.status}`
+                )
+              }
             } catch (error) {
-              Alert.alert('Error', 'Failed to record payment. Please try again.')
+              console.error('Error recording settlement:', error)
+              Alert.alert('Error', 'Network error. Please check your connection and try again.')
+            } finally {
+              setSettlingBalance(null) // Clear loading state
             }
           }
         }
@@ -132,9 +184,94 @@ export default function Page() {
     )
   }
 
+  const handleSettleAll = async () => {
+    const totalAmount = selectedTab === 'you_owe' ? totalYouOwe : totalOwedToYou
+    const actionText = selectedTab === 'you_owe' ? 'pay all debts' : 'mark all as settled'
+    const balancesToSettle = currentBalances
+    
+    if (balancesToSettle.length === 0) return
+    
+    Alert.alert(
+      'Settle All',
+      `${actionText} for a total of $${totalAmount.toFixed(2)}? This will settle ${balancesToSettle.length} balance${balancesToSettle.length > 1 ? 's' : ''}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Settle All', 
+          onPress: async () => {
+            try {
+              setLoading(true)
+              
+              const userUUID = await AsyncStorage.getItem('userUUID')
+              const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.API_BASE_URL
+              
+              if (!userUUID || !baseUrl) {
+                Alert.alert('Error', 'Configuration error. Please try again.')
+                return
+              }
+
+              // Settle each balance individually
+              let successCount = 0
+              let errorCount = 0
+              
+              for (const balance of balancesToSettle) {
+                try {
+                  const expenseId = balance.expense_id || balance.id
+                  const amount = Math.abs(balance.amount)
+                  
+                  const response = await fetch(`${baseUrl}/settle/${userUUID}/${expenseId}`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      amount: amount,
+                      settled_with: balance.user_id || balance.other_user_id || balance.name,
+                      settlement_date: new Date().toISOString().split('T')[0],
+                      notes: `Bulk settlement with ${balance.name}`,
+                      type: selectedTab === 'you_owe' ? 'payment_made' : 'payment_received'
+                    })
+                  })
+
+                  if (response.ok) {
+                    successCount++
+                  } else {
+                    errorCount++
+                    console.error(`Failed to settle balance ${balance.id}:`, response.status)
+                  }
+                } catch (error) {
+                  errorCount++
+                  console.error(`Error settling balance ${balance.id}:`, error)
+                }
+              }
+
+              // Show result
+              if (successCount > 0) {
+                Alert.alert(
+                  'Settlement Complete',
+                  `Successfully settled ${successCount} balance${successCount > 1 ? 's' : ''}${errorCount > 0 ? `. ${errorCount} failed.` : '.'}`,
+                  [{ text: 'OK', onPress: () => fetchUserBalances() }]
+                )
+              } else {
+                Alert.alert('Error', 'Failed to settle any balances. Please try again.')
+              }
+              
+            } catch (error) {
+              console.error('Error in bulk settlement:', error)
+              Alert.alert('Error', 'Failed to settle balances. Please try again.')
+            } finally {
+              setLoading(false)
+            }
+          }
+        }
+      ]
+    )
+  }
+
   const renderBalanceItem = (balance) => {
     const isOwing = selectedTab === 'you_owe'
     const amount = Math.abs(balance.amount)
+    const isSettling = settlingBalance === balance.id
     
     return (
       <View key={balance.id} style={styles.balanceItem}>
@@ -156,13 +293,19 @@ export default function Page() {
           <TouchableOpacity 
             style={[
               styles.actionButton,
-              { backgroundColor: isOwing ? COLORS.expense : COLORS.income }
+              { backgroundColor: isOwing ? COLORS.expense : COLORS.income },
+              isSettling && styles.actionButtonDisabled
             ]}
             onPress={() => handleSettleUp(balance)}
+            disabled={isSettling}
           >
-            <Text style={styles.actionButtonText}>
-              {isOwing ? 'Pay' : 'Settle'}
-            </Text>
+            {isSettling ? (
+              <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+              <Text style={styles.actionButtonText}>
+                {isOwing ? 'Pay' : 'Settle'}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -173,6 +316,14 @@ export default function Page() {
             <Text style={styles.expenseDescription}>Total balance with {balance.name}</Text>
             <Text style={styles.expenseAmount}>${amount.toFixed(2)}</Text>
           </View>
+          {balance.group_name && (
+            <View style={styles.expenseRow}>
+              <Text style={styles.expenseDescription}>From group: {balance.group_name}</Text>
+              <Text style={styles.expenseDate}>
+                {balance.expense_date && new Date(balance.expense_date).toLocaleDateString()}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Additional Actions */}
@@ -221,7 +372,7 @@ export default function Page() {
   }
 
   // Loading state
-  if (loading) {
+  if (loading && !settlingBalance) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -360,36 +511,17 @@ export default function Page() {
       {currentBalances.length > 0 && (
         <View style={styles.quickActionsContainer}>
           <TouchableOpacity 
-            style={styles.settleAllButton}
-            onPress={() => {
-              const totalAmount = selectedTab === 'you_owe' ? totalYouOwe : totalOwedToYou
-              const actionText = selectedTab === 'you_owe' ? 'pay all debts' : 'mark all as settled'
-              
-              Alert.alert(
-                'Settle All',
-                `${actionText} for a total of $${totalAmount.toFixed(2)}?`,
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { 
-                    text: 'Settle All', 
-                    onPress: async () => {
-                      try {
-                        // TODO: Implement settle all API call
-                        Alert.alert('Success', 'All balances have been settled!', [
-                          { text: 'OK', onPress: () => fetchUserBalances() }
-                        ])
-                      } catch (error) {
-                        Alert.alert('Error', 'Failed to settle balances. Please try again.')
-                      }
-                    }
-                  }
-                ]
-              )
-            }}
+            style={[styles.settleAllButton, loading && styles.settleAllButtonDisabled]}
+            onPress={handleSettleAll}
+            disabled={loading}
           >
-            <Text style={styles.settleAllButtonText}>
-              {selectedTab === 'you_owe' ? 'Pay All' : 'Settle All'}
-            </Text>
+            {loading ? (
+              <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+              <Text style={styles.settleAllButtonText}>
+                {selectedTab === 'you_owe' ? 'Pay All' : 'Settle All'}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       )}
@@ -397,9 +529,17 @@ export default function Page() {
   )
 }
 
+// Updated styles to include disabled states
+const additionalStyles = {
+  actionButtonDisabled: {
+    opacity: 0.6,
+  },
+  settleAllButtonDisabled: {
+    opacity: 0.6,
+  }
+}
+
 // TODO: Additional API endpoints needed:
-// - POST /settlements - record individual settlements
-// - POST /settlements/bulk - settle multiple balances at once  
 // - GET /balance-details/${balanceId} - get detailed breakdown of balance
 // - POST /reminders - send payment reminders
 // - POST /partial-payments - record partial payments
