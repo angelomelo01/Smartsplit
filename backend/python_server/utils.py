@@ -91,6 +91,7 @@ def create_group(user_id:str, new_group_data:dict):
 
     new_id =  uuid.uuid4().__str__()
     new_group = {
+        'friendly_id' : db.table('group')._get_next_id(),
         'key': new_id,
         'group_id' : new_id,
         'id' : new_id,
