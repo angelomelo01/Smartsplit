@@ -73,6 +73,29 @@ async def add_expense(user_id:str, request:fap.requests.Request):
 
     return None
 
+@app.post('/settle/{user_id}/{expense_id}')
+async def settle_expense(user_id:str, expense_id:str, request: fap.requests.Request):
+    '''
+    {
+        "amount": 25.50,
+        "settled_with": "other_user_id_or_name",
+        "settlement_date": "2025-01-23",
+        "notes": "Settlement between User and John Doe",
+        "type": "payment_made" // or "payment_received"
+    }
+    '''
+    user_id = user_id.replace('"', '')
+    expense_id = expense_id.replace('"', '')
+    print(f'expense_id: {expense_id}')
+    print(f'user_id: {user_id}')
+    body:bytes = await request.body()
+    settled_expense = json.loads(body)
+    rv = utils.settle_expense(
+        expense_data=settled_expense,
+        expense_id = expense_id
+    ) 
+    return None
+
 
 @app.get('/balances/{user_id}')
 async def get_outstanding_balances(user_id:str):
@@ -82,9 +105,30 @@ async def get_outstanding_balances(user_id:str):
     return utils.process_all_expenses(user_id=user_id)
 
 
+
+@app.get('/expense/{user_id}')
+async def get_recent_expenses(user_id: str):
+    '''
+    '''
+    user_id = user_id.replace('"', '')
+    rv = utils.get_all_expenses(user_id=user_id)
+    return rv 
+
+
+@app.get('/join-group/{user_id}/{group_alias}')
+async def join_group(user_id:str, group_alias:str):
+    '''
+    '''
+    user_id = user_id.replace('"', '')
+    rv = utils.join_group(user_id, group_alias)
+    return None
+
+
 @app.get('/recent-expense/{user_id}')
 async def get_recent_expenses(user_id: str):
     '''
     '''
     user_id = user_id.replace('"', '')
-    return utils.get_formatted_recent_expenses(user_id)
+    rv = utils.get_formatted_recent_expenses(user_id)
+    
+    return rv
