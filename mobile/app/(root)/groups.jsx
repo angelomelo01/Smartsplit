@@ -233,7 +233,7 @@ export default function Page() {
         </View>
         <View style={styles.groupStat}>
           <Text style={styles.groupStatNumber}>${(group.totalExpenses || 0).toFixed(2)}</Text>
-          <Text style={styles.groupStatLabel}>Total Expenses</Text>
+          <Text style={styles.groupStatLabel}>Total Spent</Text>
         </View>
       </View>
 

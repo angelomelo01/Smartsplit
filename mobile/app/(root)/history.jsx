@@ -117,17 +117,9 @@ export default function Page() {
   }
 
   const renderExpenseItem = (expense) => (
-    <TouchableOpacity 
+    <View 
       key={expense.id} 
       style={styles.expenseItem}
-      onPress={() => {
-        // If expense has group, go to group detail page
-        if (expense.groupId) {
-          router.push(`/group/${expense.groupId}`)
-        } else {
-          router.push(`/expense/${expense.id}`)
-        }
-      }}
     >
       <View style={styles.expenseIconContainer}>
         <Ionicons 
@@ -163,9 +155,8 @@ export default function Page() {
             <Text style={styles.settledText}>Settled</Text>
           </View>
         )}
-        <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
       </View>
-    </TouchableOpacity>
+    </View>
   )
 
   const renderFilterChip = (filter) => (

@@ -163,27 +163,6 @@ export default function Page() {
     )
   }
 
-  const handleSendReminder = (balance) => {
-    Alert.alert(
-      'Send Reminder',
-      `Send a friendly reminder to ${balance.name} about the $${Math.abs(balance.amount).toFixed(2)} they owe you?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Send Reminder', 
-          onPress: () => {
-            // TODO: Send reminder notification/email
-            Alert.alert(
-              'Reminder Sent',
-              `Reminder sent to ${balance.name}`,
-              [{ text: 'OK' }]
-            )
-          }
-        }
-      ]
-    )
-  }
-
   const handleSettleAll = async () => {
     const totalAmount = selectedTab === 'you_owe' ? totalYouOwe : totalOwedToYou
     const actionText = selectedTab === 'you_owe' ? 'pay all debts' : 'mark all as settled'
@@ -324,44 +303,6 @@ export default function Page() {
               </Text>
             </View>
           )}
-        </View>
-
-        {/* Additional Actions */}
-        <View style={styles.additionalActions}>
-          <TouchableOpacity 
-            style={styles.secondaryAction}
-            onPress={() => router.push(`/balance-details/${balance.id}`)}
-          >
-            <Ionicons name="eye-outline" size={16} color={COLORS.primary} />
-            <Text style={styles.secondaryActionText}>View Details</Text>
-          </TouchableOpacity>
-          
-          {!isOwing && (
-            <TouchableOpacity 
-              style={styles.secondaryAction}
-              onPress={() => handleSendReminder(balance)}
-            >
-              <Ionicons name="mail-outline" size={16} color={COLORS.primary} />
-              <Text style={styles.secondaryActionText}>Send Reminder</Text>
-            </TouchableOpacity>
-          )}
-          
-          <TouchableOpacity 
-            style={styles.secondaryAction}
-            onPress={() => {
-              Alert.alert(
-                'Partial Settlement',
-                `Record a partial payment ${isOwing ? 'to' : 'from'} ${balance.name}?`,
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Record Partial', onPress: () => router.push(`/partial-payment/${balance.id}`) }
-                ]
-              )
-            }}
-          >
-            <Ionicons name="wallet-outline" size={16} color={COLORS.primary} />
-            <Text style={styles.secondaryActionText}>Partial Payment</Text>
-          </TouchableOpacity>
         </View>
         
         <Text style={styles.lastUpdated}>

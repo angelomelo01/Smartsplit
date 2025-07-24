@@ -175,22 +175,11 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
     shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
-  },
-  expenseIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F5F5F5",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
   },
   expenseInfo: {
     flex: 1,
@@ -199,19 +188,17 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
     color: COLORS.text,
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  expenseDetails: {
+  expenseAmount: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: COLORS.primary,
+    marginBottom: 6,
+  },
+  expenseParticipants: {
     fontSize: 14,
     color: COLORS.textLight,
-  },
-  expenseDate: {
-    alignItems: "flex-end",
-  },
-  expenseDateText: {
-    fontSize: 12,
-    color: COLORS.textLight,
-    marginBottom: 4,
   },
   loadingContainer: {
     alignItems: "center",

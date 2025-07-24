@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } fr
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useUser } from '@clerk/clerk-expo'
 import { Ionicons } from '@expo/vector-icons'
-import { styles } from '@/assets/styles/group-detail.styles.js' // You'll need to create this
+import { styles } from '@/assets/styles/group-detail.styles.js'
 import { COLORS } from '@/constants/colors'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
@@ -18,6 +18,14 @@ export default function GroupDetailPage() {
   const [expensesLoading, setExpensesLoading] = useState(true)
   const [error, setError] = useState('')
   const [expensesError, setExpensesError] = useState('')
+
+  // Get first part of email for display names (same as index page)
+  const getDisplayName = (email) => {
+    if (email && email.includes('@')) {
+      return email.split('@')[0]
+    }
+    return email || 'Unknown'
+  }
 
   // Fetch group details from backend
   const fetchGroupDetails = async () => {
@@ -154,11 +162,6 @@ export default function GroupDetailPage() {
     }
   }
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  }
-
   const getCategoryIcon = (categoryId) => {
     const icons = {
       'food': 'restaurant',
@@ -171,46 +174,40 @@ export default function GroupDetailPage() {
     return icons[categoryId] || 'receipt'
   }
 
+  // Fixed member rendering - use email display name like index page
   const renderMember = (member, index) => (
     <View key={member.id || index} style={styles.memberItem}>
       <View style={styles.memberAvatar}>
         <Text style={styles.memberInitial}>
-          {member.name ? member.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+          {getDisplayName(member.email || member.name)[0].toUpperCase()}
         </Text>
       </View>
       <View style={styles.memberInfo}>
-        <Text style={styles.memberName}>{member.name || 'Unknown Member'}</Text>
+        <Text style={styles.memberName}>
+          {getDisplayName(member.email || member.name)}
+        </Text>
         <Text style={styles.memberEmail}>{member.email || 'No email'}</Text>
       </View>
     </View>
   )
 
+  // Simple expense rendering with total and participants
   const renderExpense = (expense) => (
-    <TouchableOpacity 
-      key={expense.id} 
-      style={styles.expenseItem}
-      onPress={() => router.push(`/expense/${expense.id}`)}
-    >
-      <View style={styles.expenseIconContainer}>
-        <Ionicons 
-          name={getCategoryIcon(expense.category)} 
-          size={24} 
-          color={COLORS.primary} 
-        />
-      </View>
-      
+    <View key={expense.id} style={styles.expenseItem}>
       <View style={styles.expenseInfo}>
-        <Text style={styles.expenseDescription}>{expense.description}</Text>
-        <Text style={styles.expenseDetails}>
-          ${expense.amount.toFixed(2)} • Paid by {expense.paidByName || expense.paidBy}
+        <Text style={styles.expenseDescription}>
+          {expense.description || 'Expense'}
         </Text>
+        <Text style={styles.expenseAmount}>
+          ${(expense.amount || 0).toFixed(2)}
+        </Text>
+        {expense.participants && expense.participants.length > 0 && (
+          <Text style={styles.expenseParticipants}>
+            Participants: {expense.participants.join(', ')}
+          </Text>
+        )}
       </View>
-      
-      <View style={styles.expenseDate}>
-        <Text style={styles.expenseDateText}>{formatDate(expense.createdAt || expense.date)}</Text>
-        <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
-      </View>
-    </TouchableOpacity>
+    </View>
   )
 
   // Loading state
@@ -261,7 +258,8 @@ export default function GroupDetailPage() {
     return null
   }
 
-  const totalExpenses = groupExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+  // Fixed total expenses calculation - no multiplication
+  const totalExpenses = groupExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0)
 
   return (
     <ScrollView style={styles.container}>
@@ -316,7 +314,7 @@ export default function GroupDetailPage() {
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>${totalExpenses.toFixed(2)}</Text>
-            <Text style={styles.statLabel}>Total Spent</Text>
+            <Text style={styles.statLabel}>Total Expenses</Text>
           </View>
         </View>
       </View>

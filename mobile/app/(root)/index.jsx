@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { useUser, useAuth } from '@clerk/clerk-expo'
 import { Ionicons } from '@expo/vector-icons'
 import { styles } from '@/assets/styles/index.styles.js'
 import { COLORS } from '@/constants/colors'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useCallback } from 'react'
 
 export default function Page() {
   const router = useRouter()
@@ -143,11 +144,22 @@ export default function Page() {
     }
   }
 
+  // Refresh data function
+  const refreshData = async () => {
+    await Promise.all([fetchUserBalances(), fetchRecentExpenses()])
+  }
+
   // Fetch both balances and expenses when component mounts
   useEffect(() => {
-    fetchUserBalances()
-    fetchRecentExpenses()
+    refreshData()
   }, [])
+
+  // Refresh data when screen comes into focus (e.g., after adding an expense)
+  useFocusEffect(
+    useCallback(() => {
+      refreshData()
+    }, [])
+  )
 
   const totalYouOwe = userBalances
     .filter(balance => balance.type === "you_owe")
@@ -158,7 +170,7 @@ export default function Page() {
     .reduce((sum, balance) => sum + balance.amount, 0)
 
   const renderBalanceItem = (balance) => (
-    <TouchableOpacity key={balance.id} style={styles.balanceItem}>
+    <View key={balance.id} style={styles.balanceItem}>
       <View style={styles.balanceInfo}>
         <Text style={styles.balanceName}>{balance.name}</Text>
         <Text style={[
@@ -168,23 +180,18 @@ export default function Page() {
           {balance.type === "owes_you" ? "owes you" : "you owe"} ${Math.abs(balance.amount).toFixed(2)}
         </Text>
       </View>
-      <Ionicons 
-        name="chevron-forward" 
-        size={20} 
-        color={COLORS.textLight} 
-      />
-    </TouchableOpacity>
+    </View>
   )
 
   const renderExpenseItem = (expense) => (
-    <TouchableOpacity key={expense.id} style={styles.expenseItem}>
+    <View key={expense.id} style={styles.expenseItem}>
       <View style={styles.expenseInfo}>
         <Text style={styles.expenseDescription}>{expense.description}</Text>
         <Text style={styles.expenseDetails}>
           ${expense.amount.toFixed(2)} • Paid by {expense.paidBy} • {expense.date}
         </Text>
       </View>
-    </TouchableOpacity>
+    </View>
   )
 
   // Show loading state for balances section
