@@ -500,7 +500,9 @@ def join_group(user_id:str, group_doc_id:str):
     '''
     db = TinyDB(USER_DATA_DB_PATH)
     
+    print(f'group_doc_id: {group_doc_id}')
     group_data = db.table('group').get(doc_id=group_doc_id)
+    print(f'group_data: {group_data}')
     
     user_data = db.table('user').search(Query().id == user_id)[0]
     

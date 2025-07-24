@@ -129,8 +129,9 @@ async def join_group(user_id:str, group_alias:str):
     '''
     '''
     user_id = user_id.replace('"', '')
+    group_alias = group_alias.replace('"', '')
     rv = utils.join_group(user_id, group_alias)
-    return None
+    return rv
 
 
 @app.get('/recent-expense/{user_id}')
