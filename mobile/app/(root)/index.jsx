@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
-import { useUser } from '@clerk/clerk-expo'
+import { useUser, useAuth } from '@clerk/clerk-expo'
 import { Ionicons } from '@expo/vector-icons'
 import { styles } from '@/assets/styles/index.styles.js'
 import { COLORS } from '@/constants/colors'
@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 export default function Page() {
   const router = useRouter()
   const { user } = useUser()
+  const { signOut } = useAuth()
 
   const [userBalances, setUserBalances] = useState([])
   const [recentExpenses, setRecentExpenses] = useState([])
@@ -17,6 +18,33 @@ export default function Page() {
   const [expensesLoading, setExpensesLoading] = useState(true)
   const [error, setError] = useState('')
   const [expensesError, setExpensesError] = useState('')
+
+  // Handle sign out
+  const handleSignOut = async () => {
+    try {
+      // Clear AsyncStorage
+      await AsyncStorage.removeItem('userUUID')
+      // Sign out with Clerk
+      await signOut()
+    } catch (error) {
+      console.error('Error signing out:', error)
+      Alert.alert('Error', 'Failed to sign out. Please try again.')
+    }
+  }
+
+  // Show profile menu with sign out option
+  const showProfileMenu = () => {
+    Alert.alert(
+      'Profile Menu',
+      'Choose an option',
+      [
+        { text: 'View Profile', onPress: () => router.push('/profile') },
+        { text: 'Settings', onPress: () => router.push('/settings') },
+        { text: 'Sign Out', onPress: handleSignOut, style: 'destructive' },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    )
+  }
 
   // Fetch user balances from backend
   const fetchUserBalances = async () => {
@@ -171,6 +199,11 @@ export default function Page() {
           <TouchableOpacity style={styles.retryButton} onPress={fetchUserBalances}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
+          {error.includes('not authenticated') && (
+            <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+              <Text style={styles.signOutButtonText}>Sign Out & Try Again</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )
     }
@@ -206,6 +239,11 @@ export default function Page() {
           <TouchableOpacity style={styles.retryButton} onPress={fetchRecentExpenses}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
+          {expensesError.includes('not authenticated') && (
+            <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+              <Text style={styles.signOutButtonText}>Sign Out & Try Again</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )
     }
@@ -232,7 +270,7 @@ export default function Page() {
         </View>
         <TouchableOpacity 
           style={styles.profileButton}
-          onPress={() => router.push('/profile')}
+          onPress={showProfileMenu}
         >
           <Ionicons name="person-circle-outline" size={32} color={COLORS.primary} />
         </TouchableOpacity>
@@ -307,6 +345,3 @@ export default function Page() {
     </ScrollView>
   )
 }
-
-// TODO: Database queries needed:
-// - getRecentExpenses(userId, limit) - get recent expenses involving user
