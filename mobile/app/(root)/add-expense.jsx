@@ -16,7 +16,6 @@ export default function Page() {
   const [amount, setAmount] = useState('')
   const [selectedGroup, setSelectedGroup] = useState(null)
   const [selectedParticipants, setSelectedParticipants] = useState([])
-  const [splitType, setSplitType] = useState('equal') // equal, exact, percentage
   const [category, setCategory] = useState('general')
   const [paidBy, setPaidBy] = useState(user?.id)
   const [error, setError] = useState('')
@@ -31,12 +30,6 @@ export default function Page() {
     { id: 'entertainment', name: 'Entertainment', icon: 'musical-notes' },
     { id: 'groceries', name: 'Groceries', icon: 'basket' },
     { id: 'utilities', name: 'Utilities', icon: 'flash' }
-  ]
-
-  const splitTypes = [
-    { id: 'equal', name: 'Split equally', description: 'Everyone pays the same amount' },
-    { id: 'exact', name: 'Split by exact amounts', description: 'Enter exact amount for each person' },
-    { id: 'percentage', name: 'Split by percentage', description: 'Enter percentage for each person' }
   ]
 
   // Fetch user groups from backend
@@ -134,7 +127,7 @@ export default function Page() {
         amount: parseFloat(amount),
         groupId: selectedGroup?.id || null,
         participants: selectedParticipants,
-        splitType,
+        splitType: 'equal', // Always equal split
         category,
         paidBy,
         createdBy: userUUID,
@@ -186,7 +179,7 @@ export default function Page() {
 
   const renderGroupOption = (group) => (
     <TouchableOpacity 
-      key={group.key}
+      key={group.id}
       style={[
         styles.groupOption,
         selectedGroup?.id === group.id && styles.selectedGroupOption
@@ -361,6 +354,9 @@ export default function Page() {
                 : 'Select participants'
               }
             </Text>
+            <Text style={styles.participantNote}>
+              Expense will be split equally among selected participants
+            </Text>
             
             {selectedGroup?.members ? (
               selectedGroup.members.map(renderParticipantOption)
@@ -372,29 +368,6 @@ export default function Page() {
                 }
               </Text>
             )}
-          </View>
-
-          {/* Split Type */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>How to split?</Text>
-            {splitTypes.map(split => (
-              <TouchableOpacity 
-                key={split.id}
-                style={[
-                  styles.splitOption,
-                  splitType === split.id && styles.selectedSplitOption
-                ]}
-                onPress={() => setSplitType(split.id)}
-              >
-                <View style={styles.splitInfo}>
-                  <Text style={styles.splitName}>{split.name}</Text>
-                  <Text style={styles.splitDescription}>{split.description}</Text>
-                </View>
-                {splitType === split.id && (
-                  <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />
-                )}
-              </TouchableOpacity>
-            ))}
           </View>
         </ScrollView>
 

@@ -19,6 +19,15 @@ export default function Page() {
   const [error, setError] = useState('')
   const [expensesError, setExpensesError] = useState('')
 
+  // Get first part of email for greeting
+  const getDisplayName = () => {
+    if (user?.emailAddresses?.[0]?.emailAddress) {
+      const email = user.emailAddresses[0].emailAddress
+      return email.split('@')[0]
+    }
+    return user?.firstName || 'User'
+  }
+
   // Handle sign out
   const handleSignOut = async () => {
     try {
@@ -32,14 +41,12 @@ export default function Page() {
     }
   }
 
-  // Show profile menu with sign out option
+  // Show profile menu with only sign out option
   const showProfileMenu = () => {
     Alert.alert(
-      'Profile Menu',
+      'Account',
       'Choose an option',
       [
-        { text: 'View Profile', onPress: () => router.push('/profile') },
-        { text: 'Settings', onPress: () => router.push('/settings') },
         { text: 'Sign Out', onPress: handleSignOut, style: 'destructive' },
         { text: 'Cancel', style: 'cancel' }
       ]
@@ -265,7 +272,7 @@ export default function Page() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Hello, {user?.firstName || 'User'}!</Text>
+          <Text style={styles.greeting}>Hello, {getDisplayName()}!</Text>
           <Text style={styles.subtitle}>Here's your expense summary</Text>
         </View>
         <TouchableOpacity 
@@ -323,7 +330,7 @@ export default function Page() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Outstanding Balances</Text>
-          <TouchableOpacity onPress={() => router.push('/balances')}>
+          <TouchableOpacity onPress={() => router.push('/settle-up')}>
             <Text style={styles.seeAllText}>See all</Text>
           </TouchableOpacity>
         </View>

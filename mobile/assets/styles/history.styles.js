@@ -44,14 +44,15 @@ export const styles = StyleSheet.create({
   },
   filtersContainer: {
     paddingLeft: 20,
-    marginBottom: 12,
+    marginBottom: 8,
+    maxHeight: 40,
   },
   filterChip: {
     backgroundColor: COLORS.card,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 12,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
     shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -62,7 +63,7 @@ export const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   filterChipText: {
-    fontSize: 14,
+    fontSize: 12,
     color: COLORS.text,
     fontWeight: "500",
   },
@@ -71,7 +72,33 @@ export const styles = StyleSheet.create({
   },
   categoriesContainer: {
     paddingLeft: 20,
-    marginBottom: 16,
+    marginBottom: 12,
+    maxHeight: 40,
+  },
+  categoryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginRight: 8,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  selectedCategoryChip: {
+    backgroundColor: COLORS.primary,
+  },
+  categoryChipText: {
+    fontSize: 10,
+    color: COLORS.textLight,
+    marginLeft: 4,
+  },
+  selectedCategoryChipText: {
+    color: COLORS.white,
   },
   categoryChip: {
     flexDirection: "row",
@@ -142,6 +169,7 @@ export const styles = StyleSheet.create({
   },
   expenseInfo: {
     flex: 1,
+    marginRight: 12,
   },
   expenseDescription: {
     fontSize: 16,
@@ -149,41 +177,20 @@ export const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: 4,
   },
-  expenseDetails: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  expenseDate: {
-    fontSize: 12,
-    color: COLORS.textLight,
-  },
-  expenseDivider: {
-    fontSize: 12,
-    color: COLORS.textLight,
-    marginHorizontal: 6,
-  },
-  expensePaidBy: {
-    fontSize: 12,
-    color: COLORS.textLight,
+  expenseAmount: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginBottom: 2,
   },
   expenseGroup: {
     fontSize: 12,
     color: COLORS.primary,
     fontWeight: "500",
   },
-  expenseParticipants: {
-    fontSize: 12,
-    color: COLORS.textLight,
-  },
-  expenseAmounts: {
+  expenseRight: {
     alignItems: "flex-end",
-  },
-  expenseTotal: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: COLORS.text,
-    marginBottom: 4,
+    minWidth: 80,
   },
   expenseShare: {
     fontSize: 14,

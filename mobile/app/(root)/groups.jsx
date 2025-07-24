@@ -141,7 +141,7 @@ export default function Page() {
     <TouchableOpacity 
       key={group.id}
       style={styles.groupItem}
-      onPress={() => router.push(`/group/${group.id}`)}
+      onPress={() => router.push(`/(root)/group-detail?id=${group.id}`)}
     >
       <View style={styles.groupHeader}>
         <View style={styles.groupIcon}>
