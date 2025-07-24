@@ -55,6 +55,16 @@ async def add_group(user_id:str, request:fap.requests.Request):
     return fap.responses.JSONResponse(status_code=200, content=rv)
 
 
+@app.get('/group/{group_id}')
+async def get_groups(group_id:str):
+    '''
+    '''
+    group_id = group_id.replace('"', '')
+    groups = utils.get_group(group_id=group_id)
+    
+    return groups
+
+
 @app.post('/expense/{user_id}')
 async def add_expense(user_id:str, request:fap.requests.Request):
     expense = {
@@ -103,7 +113,6 @@ async def get_outstanding_balances(user_id:str):
     '''
     user_id = user_id.replace('"', '')
     return utils.process_all_expenses(user_id=user_id)
-
 
 
 @app.get('/expense/{user_id}')

@@ -156,6 +156,13 @@ def get_user_groups(user_id:str) -> dict:
 
     return group_list
 
+def get_group(group_id:str) -> dict:
+    '''
+    '''
+    db = TinyDB(USER_DATA_DB_PATH)
+    rv = db.table('group').search(Query().id == group_id)
+    rv = rv[0]
+    return rv
 
 def add_expense(user_id:str, expense:dict):
     '''

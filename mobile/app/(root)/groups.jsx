@@ -90,15 +90,60 @@ export default function Page() {
   }
 
   const handleJoinGroup = () => {
-    Alert.alert(
+    Alert.prompt(
       'Join Group',
-      'Enter the group invite code or link',
+      'Enter the group ID:',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Enter Code', onPress: () => router.push('/join-group') }
-      ]
+        { 
+          text: 'Join', 
+          onPress: async (groupId) => {
+            if (!groupId || groupId.trim() === '') {
+              Alert.alert('Error', 'Please enter a valid group ID')
+              return
+            }
+            
+            try {
+              const userUUID = await AsyncStorage.getItem('userUUID')
+              
+              if (!userUUID) {
+                Alert.alert('Error', 'User not authenticated. Please sign in again.')
+                return
+              }
+
+              const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || process.env.API_BASE_URL
+              
+              if (!baseUrl) {
+                Alert.alert('Error', 'Server configuration error. Please try again later.')
+                return
+              }
+
+              const response = await fetch(`${baseUrl}/join-group/${userUUID}/${groupId.trim()}`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              })
+
+              if (response.ok) {
+                const result = await response.json()
+                Alert.alert('Success', 'You have successfully joined the group!')
+                fetchUserGroups() // Refresh the groups list
+              } else {
+                const errorData = await response.json().catch(() => ({}))
+                Alert.alert('Error', errorData.message || 'Failed to join group. Please check the group ID and try again.')
+              }
+            } catch (error) {
+              console.error('Error joining group:', error)
+              Alert.alert('Error', 'Network error. Please check your connection and try again.')
+            }
+          }
+        }
+      ],
+      'plain-text'
     )
   }
+
 
   const handleLeaveGroup = async (groupId, groupName) => {
     try {
